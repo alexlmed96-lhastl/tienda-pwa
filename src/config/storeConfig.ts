@@ -2,7 +2,7 @@ export const STORE_CONFIG = {
   name: 'Tienda de Tecnología',
   city: 'Cusco, Perú',
   address: 'Cusco - Centro / Tienda Física',
-  whatsappNumber: '51984000000', // Reemplaza con tu número de WhatsApp comercial (con código 51)
+  whatsappNumber: '51935238750', // Reemplaza con tu número de WhatsApp comercial (con código 51)
   whatsappMessageGreeting: '👋 ¡Hola! Deseo consultar/realizar el siguiente pedido:',
   
   // Datos que salen en la Cotización PDF y en el checkout
