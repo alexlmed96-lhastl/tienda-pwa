@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { generateQuotePdf } from '../utils/generateQuotePdf';
+import { STORE_CONFIG } from '../config/storeConfig';
 import { 
   X, 
   Trash2, 
@@ -102,10 +103,10 @@ ${deliveryText}
 
 _Por favor confírmenme disponibilidad para coordinar el pago y entrega._`;
 
-    const whatsappUrl = `https://wa.me/51984000000?text=${encodeURIComponent(message)}`;
+    const whatsappUrl = `https://wa.me/${STORE_CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
   };
-
+  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
       <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">

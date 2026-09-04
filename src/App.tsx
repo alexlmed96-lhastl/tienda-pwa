@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CartProvider } from './context/CartContext';
 import { Navbar } from './components/Navbar';
 import { ProductCard } from './components/ProductCard';
@@ -8,7 +8,8 @@ import { ProductDetailModal } from './components/ProductDetailModal';
 import { AdminPanel } from './components/AdminPanel';
 import { supabase } from './lib/supabase';
 import type { Product, CatalogItem } from './types';
-import { LayoutGrid, BookOpen, Loader2, Search, X } from 'lucide-react';
+import { LayoutGrid, BookOpen, Loader2, Search, X, Camera } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 function AppContent() {
   const [currentRoute, setCurrentRoute] = useState<'store' | 'admin'>('store');
@@ -21,6 +22,36 @@ function AppContent() {
   const [catalogs, setCatalogs] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Estado del escáner en la tienda pública
+  const [isStoreScanning, setIsStoreScanning] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  useEffect(() => {
+    if (isStoreScanning) {
+      const scanner = new Html5QrcodeScanner(
+        'store-barcode-scanner',
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        false
+      );
+      scannerRef.current = scanner;
+
+      scanner.render(
+        (decodedText) => {
+          setSearchQuery(decodedText.trim());
+          setIsStoreScanning(false);
+          scanner.clear().catch(() => {});
+        },
+        () => {}
+      );
+
+      return () => {
+        if (scannerRef.current) {
+          scannerRef.current.clear().catch(() => {});
+        }
+      };
+    }
+  }, [isStoreScanning]);
 
   useEffect(() => {
     const handleLocation = () => {
@@ -66,7 +97,8 @@ function AppContent() {
         stock: item.stock || 0,
         imageUrl:
           item.image_url ||
-          'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500&auto=format&fit=crop&q=60'
+          'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=500&auto=format&fit=crop&q=60',
+        barcode: item.barcode || undefined
       }));
 
       setProducts(mappedProducts);
@@ -114,11 +146,14 @@ function AppContent() {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return products.filter((p) => {
       const matchesSearch =
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        (p.barcode && p.barcode.toLowerCase().includes(q));
 
       const matchesCategory =
         selectedCategory === 'Todos' || p.category === selectedCategory;
@@ -190,18 +225,50 @@ function AppContent() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por nombre, categoría o descripción..."
-                className="w-full pl-11 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm placeholder:text-slate-400"
+                placeholder="Buscar por nombre, categoría o código de barras..."
+                className="w-full pl-11 pr-20 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm placeholder:text-slate-400"
               />
-              {searchQuery && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="p-1 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  type="button"
+                  onClick={() => setIsStoreScanning(!isStoreScanning)}
+                  className={`p-1.5 rounded-xl transition ${
+                    isStoreScanning
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
+                  }`}
+                  title="Escanear código con cámara"
                 >
-                  <X className="w-4 h-4" />
+                  <Camera className="w-4 h-4" />
                 </button>
-              )}
+              </div>
             </div>
+
+            {/* Escáner flotante para tienda / mostrador */}
+            {isStoreScanning && (
+              <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-lg max-w-sm mx-auto animate-in fade-in">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-blue-600" /> Apunta al código del producto
+                  </span>
+                  <button
+                    onClick={() => setIsStoreScanning(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div id="store-barcode-scanner" className="overflow-hidden rounded-xl border border-slate-200"></div>
+              </div>
+            )}
 
             {categories.length > 2 && (
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
