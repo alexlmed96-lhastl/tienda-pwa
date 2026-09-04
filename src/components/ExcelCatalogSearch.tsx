@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ExcelJS from 'exceljs';
-import { Search, Mic, MicOff, Upload, FileSpreadsheet, X, ShoppingBag, Package, DollarSign } from 'lucide-react';
+import { Search, Mic, MicOff, Upload, FileSpreadsheet, X } from 'lucide-react';
 
 interface ExcelItem {
   id: string;
