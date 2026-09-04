@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Product, CatalogItem } from '../types';
 import { exportToFacebookCSV } from '../utils/exportFacebookFeed';
@@ -37,9 +37,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRefreshCatalogs,
   onBackToStore
 }) => {
+  // Estados de Autenticación Supabase
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [adminTab, setAdminTab] = useState<'products' | 'catalogs' | 'excel'>('products');
 
   // Formulario Producto
@@ -62,17 +67,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [externalUrl, setExternalUrl] = useState('');
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
-  const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234';
+  // Escuchar sesión activa de Supabase
+  useEffect(() => {
+    const checkInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsAuthenticated(!!session);
+      } catch (err) {
+        console.error('Error al verificar sesión:', err);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
 
-  const handleLogin = (e: React.FormEvent) => {
+    checkInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      setIsAuthenticated(true);
-      setPinError(false);
-    } else {
-      setPinError(true);
-      setPin('');
+    if (!email || !password) return;
+
+    try {
+      setIsLoggingIn(true);
+      setAuthError('');
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      if (error) {
+        setAuthError(error.message === 'Invalid login credentials' 
+          ? 'Correo o contraseña incorrectos.' 
+          : error.message);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || 'Error inesperado al iniciar sesión.');
+    } finally {
+      setIsLoggingIn(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -289,6 +333,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     exportToFacebookCSV(listToExport);
   };
 
+  // Pantalla de carga mientras lee token persistido
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // Pantalla de Login Supabase
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -297,32 +351,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <Lock className="w-7 h-7" />
           </div>
           <h1 className="text-xl font-black text-slate-900">Panel de Administración</h1>
-          <p className="text-xs text-slate-500 mt-1 mb-6">Ingresa el PIN de seguridad</p>
+          <p className="text-xs text-slate-500 mt-1 mb-6">Ingreso restringido mediante credenciales seguras</p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="PIN de acceso"
-              className="w-full text-center tracking-widest text-xl font-bold py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-              autoFocus
-            />
-            {pinError && <p className="text-red-500 text-xs font-semibold">PIN incorrecto.</p>}
+          {authError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl text-left">
+              {authError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-3">
+            <div>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Correo electrónico"
+                className="w-full text-sm py-2.5 px-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Contraseña"
+                className="w-full text-sm py-2.5 px-3.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+              />
+            </div>
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-sm"
+              disabled={isLoggingIn}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              Ingresar al Panel
+              {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>{isLoggingIn ? 'Comprobando...' : 'Iniciar Sesión'}</span>
             </button>
           </form>
 
           <button
             onClick={onBackToStore}
-            className="mt-4 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+            className="mt-4 text-xs font-semibold text-slate-500 hover:text-slate-800 transition block mx-auto"
           >
             ← Volver a la Tienda
           </button>
@@ -406,7 +479,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
 
             <button
-              onClick={() => setIsAuthenticated(false)}
+              onClick={handleLogout}
               className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 py-2 rounded-xl text-xs font-bold transition"
             >
               <LogOut className="w-4 h-4" />
