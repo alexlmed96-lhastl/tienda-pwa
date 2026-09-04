@@ -14,6 +14,7 @@ export const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose }) => {
 
   // Reemplaza con tu número de WhatsApp con código de país (ejemplo: 51 para Perú)
   const WHATSAPP_NUMBER = '51935238750';
+  
 
   if (!isOpen) return null;
 
