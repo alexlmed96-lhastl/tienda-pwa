@@ -62,7 +62,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [externalUrl, setExternalUrl] = useState('');
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
-  const ADMIN_PIN = '1234';
+  const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234';
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
